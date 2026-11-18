@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FlashNotes</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <section data-view="home">
+      <header class="bar">
+        <h1>FlashNotes</h1>
+        <button type="button" id="new-set-btn" class="primary">New set</button>
+      </header>
+      <p id="empty-msg" class="muted">No sets yet — create one to get started.</p>
+      <ul id="set-list" class="set-list"></ul>
+    </section>
+
+    <section data-view="create" hidden>
+      <h2>New set</h2>
+      <form id="create-form" novalidate>
+        <label for="set-name">Set name</label>
+        <input type="text" id="set-name" autocomplete="off">
+
+        <h3>Cards</h3>
+        <div id="card-rows"></div>
+        <button type="button" id="add-card-btn">Add card</button>
+
+        <div id="form-errors" class="errors" role="alert" hidden></div>
+
+        <div class="form-actions">
+          <button type="submit" class="primary">Save</button>
+          <button type="button" id="cancel-create-btn">Cancel</button>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

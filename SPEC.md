@@ -114,13 +114,13 @@ tests.js     – a tiny test harness plus each phase's tests
 
 ### Acceptance criteria
 
-- [ ] Opening `index.html` directly from the file system works, with no console errors.
-- [ ] You can create a set with 3 cards, and it appears on Home with "3 cards".
-- [ ] After a page refresh, the set is still there.
-- [ ] Saving with an empty name, with zero cards, or with a half-filled card shows an error and saves nothing.
-- [ ] Cancel returns to Home without saving.
-- [ ] Deleting a set removes it after confirmation. Choosing Cancel in the dialog keeps it.
-- [ ] Typing `<b>hi</b>` as a set name or card text displays those characters literally; the text does not turn bold.
+- [x] Opening `index.html` directly from the file system works, with no console errors.
+- [x] You can create a set with 3 cards, and it appears on Home with "3 cards".
+- [x] After a page refresh, the set is still there.
+- [x] Saving with an empty name, with zero cards, or with a half-filled card shows an error and saves nothing.
+- [x] Cancel returns to Home without saving.
+- [x] Deleting a set removes it after confirmation. Choosing Cancel in the dialog keeps it.
+- [x] Typing `<b>hi</b>` as a set name or card text displays those characters literally; the text does not turn bold.
 
 ---
 
