@@ -218,6 +218,11 @@ test('sortNewestFirst orders by createdAt descending without changing input', fu
   assertEqual(sets[0].id, 'a', 'input should be unchanged');
 });
 
+test('sortNewestFirst puts the later-added set first when createdAt ties', function () {
+  var sets = [{ id: 'old', createdAt: 5 }, { id: 'a', createdAt: 9 }, { id: 'b', createdAt: 9 }];
+  assertEqual(sortNewestFirst(sets).map(function (s) { return s.id; }), ['b', 'a', 'old']);
+});
+
 test('cardCountLabel pluralises correctly', function () {
   assertEqual(cardCountLabel(1), '1 card');
   assertEqual(cardCountLabel(3), '3 cards');
@@ -306,6 +311,154 @@ test('study functions do not change their input session or set', function () {
   studyFlip(s); studyNext(s); studyPrev(s); studyView(s);
   assertEqual(JSON.stringify(s), sCopy);
   assertEqual(JSON.stringify(set), setCopy);
+});
+
+/* ===================== Phase 3: test mode ===================== */
+
+// Deterministic "random" source for tests: cycles through the given values.
+function fakeRand(values) {
+  var i = 0;
+  return function () { var v = values[i % values.length]; i += 1; return v; };
+}
+
+function ids(cards) {
+  return cards.map(function (c) { return c.id; });
+}
+
+// Grades every card in order: grades[i] true = Got it, false = Missed it.
+function runThrough(session, grades) {
+  grades.forEach(function (g) { session = gradeCard(revealAnswer(session), g); });
+  return session;
+}
+
+test('shuffle returns the same cards, same count, without changing the original', function () {
+  var cards = sampleSet(10).cards;
+  var copy = JSON.stringify(cards);
+  var out = shuffle(cards);
+  assertEqual(out.length, 10);
+  assertEqual(ids(out).slice().sort(), ids(cards).slice().sort());
+  assertEqual(JSON.stringify(cards), copy, 'original unchanged');
+  assert(out !== cards, 'should return a new array');
+});
+
+test('shuffle is a Fisher–Yates shuffle (known order with fixed random values)', function () {
+  // rand() = 0 always swaps i with 0: [a,b,c,d] -> i=3:[d,b,c,a] i=2:[c,b,d,a] i=1:[b,c,d,a]
+  assertEqual(shuffle(['a', 'b', 'c', 'd'], fakeRand([0])), ['b', 'c', 'd', 'a']);
+  // rand() just under 1 swaps i with itself: order unchanged.
+  assertEqual(shuffle(['a', 'b', 'c', 'd'], fakeRand([0.999])), ['a', 'b', 'c', 'd']);
+});
+
+test('shuffle produces different orders across runs', function () {
+  var cards = sampleSet(8).cards;
+  var seen = {};
+  for (var i = 0; i < 20; i++) seen[ids(shuffle(cards)).join(',')] = true;
+  assert(Object.keys(seen).length > 1, 'expected more than one order in 20 shuffles');
+});
+
+test('shuffle handles empty and single-item arrays', function () {
+  assertEqual(shuffle([]), []);
+  assertEqual(shuffle(['x']), ['x']);
+});
+
+test('side "front": prompt is the front, answer is the back', function () {
+  var card = { id: 'c', front: 'hablar', back: 'to speak' };
+  assertEqual(cardSides(card, 'front'), { prompt: 'hablar', answer: 'to speak' });
+  var v = testView(startTest([card], 'front'));
+  assertEqual([v.prompt, v.answer, v.promptLabel, v.answerLabel], ['hablar', 'to speak', 'Front', 'Back']);
+});
+
+test('side "back": prompt is the back, answer is the front', function () {
+  var card = { id: 'c', front: 'hablar', back: 'to speak' };
+  assertEqual(cardSides(card, 'back'), { prompt: 'to speak', answer: 'hablar' });
+  var v = testView(startTest([card], 'back'));
+  assertEqual([v.prompt, v.answer, v.promptLabel, v.answerLabel], ['to speak', 'hablar', 'Back', 'Front']);
+});
+
+test('startTest shuffles the cards and starts at card 1, answer hidden', function () {
+  var cards = sampleSet(4).cards;
+  var s = startTest(cards, 'front', fakeRand([0]));
+  assertEqual(ids(s.cards), ['c_1', 'c_2', 'c_3', 'c_0']);
+  assertEqual([s.index, s.revealed, s.results.length, s.side], [0, false, 0, 'front']);
+  assertEqual(testView(s).position, 'Card 1 of 4');
+  assertEqual(ids(cards), ['c_0', 'c_1', 'c_2', 'c_3'], 'original cards unchanged');
+});
+
+test('revealAnswer shows the answer without moving', function () {
+  var s = revealAnswer(startTest(sampleSet(3).cards, 'front'));
+  assertEqual([s.revealed, s.index], [true, 0]);
+});
+
+test('a card cannot be graded before the answer is revealed', function () {
+  var s = startTest(sampleSet(3).cards, 'front');
+  var after = gradeCard(s, true);
+  assertEqual([after.index, after.results.length], [0, 0]);
+});
+
+test('grading moves to the next card and hides the answer', function () {
+  var s = gradeCard(revealAnswer(startTest(sampleSet(3).cards, 'front')), true);
+  assertEqual([s.index, s.revealed, s.results.length], [1, false, 1]);
+  assertEqual(testView(s).position, 'Card 2 of 3');
+});
+
+test('Got it / Missed it give the correct score and missed list', function () {
+  var s = startTest(sampleSet(5).cards, 'front');
+  var order = ids(s.cards);
+  s = runThrough(s, [true, false, true, false, true]);
+  var score = testScore(s);
+  assertEqual(score, { correct: 3, total: 5, percent: 60 });
+  assertEqual(formatScore(score), '3 / 5 (60%)');
+  assertEqual(ids(missedCards(s)), [order[1], order[3]]);
+});
+
+test('score formatting rounds the percentage', function () {
+  var s = runThrough(startTest(sampleSet(3).cards, 'front'), [true, true, false]);
+  assertEqual(formatScore(testScore(s)), '2 / 3 (67%)');
+  s = runThrough(startTest(sampleSet(3).cards, 'front'), [true, true, true]);
+  assertEqual(formatScore(testScore(s)), '3 / 3 (100%)');
+  assertEqual(missedCards(s), []);
+});
+
+test('the session ends after the last card, and no card can be graded twice', function () {
+  var s = startTest(sampleSet(3).cards, 'front');
+  s = runThrough(s, [true, true, true]);
+  assert(isTestDone(s), 'should be done after 3 grades');
+  var again = gradeCard(revealAnswer(s), false);
+  assertEqual(again.results.length, 3, 'no extra result after the end');
+  assertEqual(testScore(again), { correct: 3, total: 3, percent: 100 });
+  var graded = ids(s.results.map(function (r) { return r.card; }));
+  assertEqual(graded.slice().sort(), ['c_0', 'c_1', 'c_2'], 'each card graded exactly once');
+});
+
+test('retry contains only the missed cards, keeps the side, and is reshuffled', function () {
+  var s = startTest(sampleSet(6).cards, 'back');
+  s = runThrough(s, [false, true, false, true, false, true]);
+  var missed = ids(missedCards(s));
+  var retry = retryMissed(s, fakeRand([0]));
+  assertEqual(retry.side, 'back');
+  assertEqual(ids(retry.cards).slice().sort(), missed.slice().sort());
+  assertEqual([retry.index, retry.revealed, retry.results.length], [0, false, 0]);
+  // with rand = 0, [m0, m1, m2] shuffles to [m1, m2, m0]
+  assertEqual(ids(retry.cards), [missed[1], missed[2], missed[0]]);
+});
+
+test('retrying until nothing is missed ends with an empty missed list', function () {
+  var s = runThrough(startTest(sampleSet(4).cards, 'front'), [false, false, true, false]);
+  s = runThrough(retryMissed(s), [true, false, true]);
+  assertEqual(missedCards(s).length, 1);
+  s = runThrough(retryMissed(s), [true]);
+  assertEqual(missedCards(s), []);
+  assertEqual(formatScore(testScore(s)), '1 / 1 (100%)');
+});
+
+test('test functions do not change their input session', function () {
+  var s = startTest(sampleSet(3).cards, 'front');
+  var copy = JSON.stringify(s);
+  revealAnswer(s); testView(s); testScore(s); missedCards(s);
+  var r = revealAnswer(s);
+  var rCopy = JSON.stringify(r);
+  gradeCard(r, false); retryMissed(r);
+  assertEqual(JSON.stringify(s), copy);
+  assertEqual(JSON.stringify(r), rCopy);
 });
 
 runTests();

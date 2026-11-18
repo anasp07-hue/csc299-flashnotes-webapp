@@ -52,6 +52,59 @@
         <button type="button" id="study-next-btn">Next</button>
       </div>
     </section>
+
+    <section data-view="test-setup" hidden>
+      <h2 id="setup-title" class="study-title"></h2>
+      <fieldset class="side-choice">
+        <legend>Which side do you want to be shown?</legend>
+        <label class="radio"><input type="radio" name="test-side" id="side-front" value="front" checked> Show front (answer with back)</label>
+        <label class="radio"><input type="radio" name="test-side" id="side-back" value="back"> Show back (answer with front)</label>
+      </fieldset>
+      <div class="form-actions">
+        <button type="button" id="start-test-btn" class="primary">Start test</button>
+        <button type="button" id="cancel-setup-btn">Cancel</button>
+      </div>
+    </section>
+
+    <section data-view="test" hidden>
+      <header class="bar">
+        <h2 id="test-title" class="study-title"></h2>
+        <button type="button" id="quit-test-btn">Quit test</button>
+      </header>
+      <p id="test-position" class="study-position"></p>
+      <div class="test-card">
+        <span id="test-prompt-label" class="side-label"></span>
+        <p id="test-prompt" class="test-text"></p>
+      </div>
+      <div id="test-answer-box" class="test-card answer" hidden>
+        <span id="test-answer-label" class="side-label"></span>
+        <p id="test-answer" class="test-text"></p>
+      </div>
+      <div class="test-actions">
+        <button type="button" id="reveal-btn" class="primary">Reveal answer</button>
+        <div id="grade-buttons" class="grade-buttons" hidden>
+          <button type="button" id="got-it-btn" class="good">Got it</button>
+          <button type="button" id="missed-it-btn" class="danger">Missed it</button>
+        </div>
+      </div>
+      <p class="muted hint">Space reveals the answer. Then press 1 for Got it or 2 for Missed it.</p>
+    </section>
+
+    <section data-view="results" hidden>
+      <h2 id="results-title" class="study-title"></h2>
+      <p class="score-label">Score</p>
+      <p id="results-score" class="score"></p>
+      <p id="all-correct-msg" class="muted">No misses. Nice work!</p>
+      <div id="missed-section">
+        <h3>Missed cards</h3>
+        <ul id="missed-list" class="missed-list"></ul>
+      </div>
+      <div class="form-actions">
+        <button type="button" id="retry-missed-btn" class="primary">Retry missed</button>
+        <button type="button" id="test-again-btn">Test again</button>
+        <button type="button" id="results-home-btn">Back to sets</button>
+      </div>
+    </section>
   </main>
   <script src="app.js"></script>
 </body>

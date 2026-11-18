@@ -194,12 +194,12 @@ tests.js     – a tiny test harness plus each phase's tests
 
 ### Acceptance criteria
 
-- [ ] A test on the front side shows fronts as prompts and reveals backs. A test on the back side does the reverse.
-- [ ] Card order differs between runs. This is random, so check it with a set of at least 5 cards.
-- [ ] The Got it / Missed it buttons are not available until the answer is revealed.
-- [ ] The score shown at the end matches the number of "Got it" clicks.
-- [ ] Retry missed tests only the missed cards. Retrying repeatedly eventually reaches a score with no misses, and then the Retry button is hidden.
-- [ ] Quitting mid-test returns to Home after confirmation.
+- [x] A test on the front side shows fronts as prompts and reveals backs. A test on the back side does the reverse.
+- [x] Card order differs between runs. This is random, so check it with a set of at least 5 cards.
+- [x] The Got it / Missed it buttons are not available until the answer is revealed.
+- [x] The score shown at the end matches the number of "Got it" clicks.
+- [x] Retry missed tests only the missed cards. Retrying repeatedly eventually reaches a score with no misses, and then the Retry button is hidden.
+- [x] Quitting mid-test returns to Home after confirmation.
 
 ---
 
