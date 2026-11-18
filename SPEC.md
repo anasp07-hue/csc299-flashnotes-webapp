@@ -151,11 +151,11 @@ tests.js     – a tiny test harness plus each phase's tests
 
 ### Acceptance criteria
 
-- [ ] Study opens on card 1, showing the front.
-- [ ] Clicking the card or pressing Space toggles between the front and the back.
-- [ ] Next and Prev move between cards and reset to the front. The buttons disable at the ends.
-- [ ] The arrow keys work. Pressing Space does not scroll the page.
-- [ ] Back to sets returns to Home.
+- [x] Study opens on card 1, showing the front.
+- [x] Clicking the card or pressing Space toggles between the front and the back.
+- [x] Next and Prev move between cards and reset to the front. The buttons disable at the ends.
+- [x] The arrow keys work. Pressing Space does not scroll the page.
+- [x] Back to sets returns to Home.
 
 ---
 

@@ -224,4 +224,88 @@ test('cardCountLabel pluralises correctly', function () {
   assertEqual(cardCountLabel(0), '0 cards');
 });
 
+/* ===================== Phase 2: study mode ===================== */
+
+function sampleSet(n) {
+  var cards = [];
+  for (var i = 0; i < n; i++) cards.push({ id: 'c_' + i, front: 'F' + i, back: 'B' + i });
+  return { id: 's_x', name: 'Sample', createdAt: 1, cards: cards };
+}
+
+test('findSet returns the matching set, or null', function () {
+  var sets = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+  assertEqual(findSet(sets, 'b').name, 'B');
+  assertEqual(findSet(sets, 'zzz'), null);
+});
+
+test('study starts at index 0 showing the front', function () {
+  var s = startStudy(sampleSet(3));
+  assertEqual(s.index, 0);
+  assertEqual(s.flipped, false);
+  var v = studyView(s);
+  assertEqual(v.text, 'F0');
+  assertEqual(v.side, 'Front');
+  assertEqual(v.position, 'Card 1 of 3');
+});
+
+test('flipping toggles between front and back', function () {
+  var s = startStudy(sampleSet(3));
+  s = studyFlip(s);
+  assertEqual(studyView(s).side, 'Back');
+  assertEqual(studyView(s).text, 'B0');
+  s = studyFlip(s);
+  assertEqual(studyView(s).side, 'Front');
+  assertEqual(studyView(s).text, 'F0');
+});
+
+test('Next and Prev move between cards', function () {
+  var s = startStudy(sampleSet(3));
+  s = studyNext(s);
+  assertEqual(s.index, 1);
+  assertEqual(studyView(s).text, 'F1');
+  s = studyNext(s);
+  assertEqual(studyView(s).position, 'Card 3 of 3');
+  s = studyPrev(s);
+  assertEqual(s.index, 1);
+});
+
+test('Prev does not move past the first card', function () {
+  var s = studyPrev(startStudy(sampleSet(3)));
+  assertEqual(s.index, 0);
+  assertEqual(studyView(s).canPrev, false);
+});
+
+test('Next does not move past the last card', function () {
+  var s = startStudy(sampleSet(2));
+  s = studyNext(studyNext(studyNext(s)));
+  assertEqual(s.index, 1);
+  assertEqual(studyView(s).canNext, false);
+  assertEqual(studyView(s).canPrev, true);
+});
+
+test('moving to another card resets the view to the front', function () {
+  var s = studyFlip(startStudy(sampleSet(3)));
+  s = studyNext(s);
+  assertEqual(s.flipped, false);
+  s = studyFlip(s);
+  s = studyPrev(s);
+  assertEqual(s.flipped, false);
+  assertEqual(studyView(s).text, 'F0');
+});
+
+test('a single-card set has Prev and Next both disabled', function () {
+  var v = studyView(startStudy(sampleSet(1)));
+  assertEqual([v.canPrev, v.canNext, v.position], [false, false, 'Card 1 of 1']);
+});
+
+test('study functions do not change their input session or set', function () {
+  var set = sampleSet(3);
+  var setCopy = JSON.stringify(set);
+  var s = startStudy(set);
+  var sCopy = JSON.stringify(s);
+  studyFlip(s); studyNext(s); studyPrev(s); studyView(s);
+  assertEqual(JSON.stringify(s), sCopy);
+  assertEqual(JSON.stringify(set), setCopy);
+});
+
 runTests();

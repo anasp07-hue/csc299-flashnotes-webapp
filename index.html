@@ -35,6 +35,23 @@
         </div>
       </form>
     </section>
+
+    <section data-view="study" hidden>
+      <header class="bar">
+        <h2 id="study-title" class="study-title"></h2>
+        <button type="button" id="study-back-btn">Back to sets</button>
+      </header>
+      <div id="study-card" class="study-card" role="button" tabindex="0">
+        <span id="study-side" class="side-label"></span>
+        <p id="study-text" class="study-text"></p>
+      </div>
+      <p class="muted hint">Click the card or press Space to flip. Use ← and → to move.</p>
+      <div class="study-nav">
+        <button type="button" id="study-prev-btn">Prev</button>
+        <span id="study-position" class="study-position"></span>
+        <button type="button" id="study-next-btn">Next</button>
+      </div>
+    </section>
   </main>
   <script src="app.js"></script>
 </body>

@@ -135,11 +135,57 @@ function cardCountLabel(n) {
   return n + (n === 1 ? ' card' : ' cards');
 }
 
+// Returns the set with this id, or null.
+function findSet(sets, id) {
+  for (var i = 0; i < sets.length; i++) {
+    if (sets[i].id === id) return sets[i];
+  }
+  return null;
+}
+
+/* --- Study session: { name, cards, index, flipped } (memory only) --- */
+
+function startStudy(set) {
+  return { name: set.name, cards: set.cards.slice(), index: 0, flipped: false };
+}
+
+function studyFlip(session) {
+  return { name: session.name, cards: session.cards, index: session.index, flipped: !session.flipped };
+}
+
+// Moves to index + step if that stays in bounds; moving always shows the front.
+function studyMove(session, step) {
+  var next = session.index + step;
+  if (next < 0 || next >= session.cards.length) return studyCopy(session);
+  return { name: session.name, cards: session.cards, index: next, flipped: false };
+}
+
+function studyNext(session) { return studyMove(session, 1); }
+function studyPrev(session) { return studyMove(session, -1); }
+
+function studyCopy(session) {
+  return { name: session.name, cards: session.cards, index: session.index, flipped: session.flipped };
+}
+
+// What the Study view should show for this session.
+function studyView(session) {
+  var total = session.cards.length;
+  var card = session.cards[session.index];
+  return {
+    text: card ? (session.flipped ? card.back : card.front) : '',
+    side: session.flipped ? 'Back' : 'Front',
+    position: 'Card ' + (total ? session.index + 1 : 0) + ' of ' + total,
+    canPrev: session.index > 0,
+    canNext: session.index < total - 1
+  };
+}
+
 /* ===================== 3. UI state and rendering ===================== */
 
 var state = {
   view: 'home',
-  sets: []
+  sets: [],
+  study: null
 };
 
 function showView(name) {
@@ -174,6 +220,12 @@ function renderHome() {
 
     var actions = document.createElement('div');
     actions.className = 'set-actions';
+    var study = document.createElement('button');
+    study.type = 'button';
+    study.className = 'primary';
+    study.textContent = 'Study';
+    study.addEventListener('click', function () { onStudySet(set.id); });
+    actions.appendChild(study);
     var del = document.createElement('button');
     del.type = 'button';
     del.className = 'danger';
@@ -264,7 +316,68 @@ function showFormErrors(errors) {
   box.hidden = false;
 }
 
+function renderStudy(animate) {
+  var view = studyView(state.study);
+  document.getElementById('study-title').textContent = state.study.name;
+  document.getElementById('study-side').textContent = view.side;
+  document.getElementById('study-text').textContent = view.text;
+  document.getElementById('study-position').textContent = view.position;
+  document.getElementById('study-prev-btn').disabled = !view.canPrev;
+  document.getElementById('study-next-btn').disabled = !view.canNext;
+
+  var card = document.getElementById('study-card');
+  card.setAttribute('aria-label', view.side + ' of card. Activate to flip.');
+  card.scrollTop = 0;
+  card.classList.remove('flip');
+  if (animate) {
+    void card.offsetWidth; // restart the animation
+    card.classList.add('flip');
+  }
+}
+
 /* ===================== 4. Events and init ===================== */
+
+function onStudySet(id) {
+  var set = findSet(loadSets(), id);
+  if (!set) { goHome(); return; }
+  state.study = startStudy(set);
+  renderStudy(false);
+  showView('study');
+  document.getElementById('study-card').focus();
+}
+
+function onStudyFlip() {
+  state.study = studyFlip(state.study);
+  renderStudy(true);
+}
+
+function onStudyNext() {
+  state.study = studyNext(state.study);
+  renderStudy(false);
+}
+
+function onStudyPrev() {
+  state.study = studyPrev(state.study);
+  renderStudy(false);
+}
+
+function onKeyDown(event) {
+  if (state.view !== 'study') return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  var card = document.getElementById('study-card');
+  if (event.key === ' ' || event.key === 'Spacebar') {
+    event.preventDefault(); // no page scroll
+    // A focused button would also be "clicked" by Space on keyup; release it first.
+    if (document.activeElement && document.activeElement !== card) document.activeElement.blur();
+    if (!event.repeat) onStudyFlip();
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    onStudyNext();
+  } else if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    onStudyPrev();
+  }
+}
 
 function goHome() {
   state.sets = loadSets();
@@ -310,6 +423,11 @@ function init() {
   document.getElementById('add-card-btn').addEventListener('click', onAddCard);
   document.getElementById('create-form').addEventListener('submit', onSaveSet);
   document.getElementById('cancel-create-btn').addEventListener('click', goHome);
+  document.getElementById('study-back-btn').addEventListener('click', goHome);
+  document.getElementById('study-card').addEventListener('click', onStudyFlip);
+  document.getElementById('study-prev-btn').addEventListener('click', onStudyPrev);
+  document.getElementById('study-next-btn').addEventListener('click', onStudyNext);
+  document.addEventListener('keydown', onKeyDown);
   goHome();
 }
 
