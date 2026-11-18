@@ -24,16 +24,17 @@ Read these first:
 
 - **Classic scripts only.** No ES modules: Chrome blocks `type="module"` scripts loaded from `file://`. Declare functions at the top level of `app.js` so `tests.js` can call them as globals.
 - **No dependencies, no build step** (ADR 0001).
-- **Storage:** everything goes through `loadSets()` and `saveSets(sets)` under the key `flashnotes.sets` (ADR 0002).
+- **Storage:** everything goes through `loadSets()` and `saveSets(sets)` under the key `flashnotes.sets` (ADR 0002). The one exception is `storageAvailable()`, which writes and removes the probe key `flashnotes.probe` at startup to check that saving works (ADR 0005).
 - **Testable logic:** logic functions never touch `document` or `localStorage`. The UI is connected only when `#app` exists (ADR 0004).
 
 ## How app.js is organised
 
 Keep `app.js` in four sections, in this order, each with a comment header:
 
-1. **Storage:** `loadSets()` and `saveSets(sets)`.
+1. **Storage:** `loadSets()`, `saveSets(sets)` and `storageAvailable()`.
    - `loadSets()` never throws. It returns `[]` when storage is missing or the data can't be parsed.
    - `loadSets()` fills in sensible defaults for missing fields, so older saved data still loads.
+   - `saveSets()` returns `false` if the browser refuses the write. It then keeps an in-memory copy that `loadSets()` reads for the rest of the session (ADR 0005).
 2. **Logic:** plain functions that take data in and return new data or a result.
    - They don't change their inputs; they return a new copy.
    - They don't touch the DOM and don't save anything themselves.

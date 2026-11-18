@@ -26,7 +26,7 @@ Review the current phase and report whether it is ready to call done. **Report o
 Search the code to check each rule:
 - **No dependencies:** look for `src="http`, `href="http`, `import `, `require(`, `type="module"` and any `package.json`. All of these should be absent.
 - **Safe rendering:** search for `innerHTML`, `outerHTML` and `insertAdjacentHTML`. Any of these with user data is a **blocker**.
-- **Storage:** search for `localStorage`. Outside `loadSets` and `saveSets` it may appear only in the tests' backup and restore code.
+- **Storage:** search for `localStorage`. Outside `loadSets` and `saveSets` it may appear only in `storageAvailable()` (the startup probe, ADR 0005) and in the tests' backup and restore code. All three storage functions must stay in the Storage section of `app.js`.
 - **Logic and DOM kept apart:** logic functions must not touch `document`. The UI should be connected only when `#app` exists.
 
 ### Tests

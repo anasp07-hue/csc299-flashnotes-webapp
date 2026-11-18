@@ -34,11 +34,10 @@
 - Committed? yes. Phase 4 and Phase 5 are separate commits, pushed to `origin/main`.
 
 ## What's next
-1. Decide whether to update `CLAUDE.md`'s storage rule to mention the `storageAvailable()` exception (ADR 0005).
-2. Optional: responsive layout, if wanted later.
+1. Optional: responsive layout, if wanted later.
 
 ## Open questions / blockers
-- Should `CLAUDE.md` (and the `backend-architect` skill text) mention the `storageAvailable()` exception to "all storage access goes through `loadSets`/`saveSets`"?
+- None. `CLAUDE.md` and the `backend-architect` and `phase-review` skills now name the `storageAvailable()` exception to the storage rule (ADR 0005).
 
 ## Decisions made (link ADRs)
 - Dark mode follows the system setting only, with no in-app toggle. The user confirmed they prefer this.

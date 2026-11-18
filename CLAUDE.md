@@ -24,7 +24,7 @@ FlashNotes is a simple browser flashcard app built with plain HTML, CSS and JS.
 ### Code
 - **No dependencies.** Use plain HTML, CSS and JS only: no frameworks, no npm packages, no CDN scripts, no build step. The app must work when you open `index.html` straight from the file system.
 - **Safe text rendering.** Put user text into the page with `textContent`. Never use `innerHTML` (or `insertAdjacentHTML`) with user data.
-- All storage access goes through `loadSets()` and `saveSets()` in `app.js`.
+- All storage access goes through `loadSets()` and `saveSets()` in `app.js`. The one exception is `storageAvailable()`, which writes and removes a probe key (`flashnotes.probe`) at startup to check that saving works (ADR 0005). Keep all three in the Storage section of `app.js`.
 
 ### Tests
 - Each phase adds its own tests to `tests.js`. Tests run in `tests.html` using the small built-in harness; see ADR 0004.
