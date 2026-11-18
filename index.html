@@ -3,11 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>FlashNotes</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main id="app">
+    <p id="storage-warning" class="storage-warning" role="status" hidden>Your browser isn't letting FlashNotes save, so sets will be lost when you close this page.</p>
+    <div id="live" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
     <section data-view="home">
       <header class="bar">
         <h1>FlashNotes</h1>
@@ -41,11 +45,11 @@
         <h2 id="study-title" class="study-title"></h2>
         <button type="button" id="study-back-btn">Back to sets</button>
       </header>
-      <div id="study-card" class="study-card" role="button" tabindex="0">
+      <div id="study-card" class="study-card" role="button" tabindex="0" aria-describedby="study-hint">
         <span id="study-side" class="side-label"></span>
         <p id="study-text" class="study-text"></p>
       </div>
-      <p class="muted hint">Click the card or press Space to flip. Use ← and → to move.</p>
+      <p id="study-hint" class="muted hint">Click the card or press Space to flip. Use ← and → to move.</p>
       <div class="study-nav">
         <button type="button" id="study-prev-btn">Prev</button>
         <span id="study-position" class="study-position"></span>

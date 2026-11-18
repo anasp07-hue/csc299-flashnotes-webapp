@@ -10,6 +10,7 @@ An ADR records one decision: the context behind it, what was decided, and the co
 | [0002](0002-localstorage-persistence.md) | Store sets in localStorage | Accepted |
 | [0003](0003-self-graded-test-mode.md) | Self-graded test mode | Accepted |
 | [0004](0004-browser-test-runner.md) | In-browser test runner (tests.html) | Accepted |
+| [0005](0005-storage-failure-fallback.md) | Storage availability check and in-memory fallback | Accepted |
 
 ## Template
 

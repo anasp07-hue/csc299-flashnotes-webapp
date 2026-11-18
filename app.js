@@ -6,14 +6,35 @@
 /* ===================== 1. Storage ===================== */
 
 var STORAGE_KEY = 'flashnotes.sets';
+var PROBE_KEY = 'flashnotes.probe';
+
+// When the browser refuses to save, the last saved sets are kept here (as JSON)
+// so the app still works for this session. See ADR 0005.
+var memoryCopy = null;
+
+// True if localStorage can be written. Never throws. Uses its own probe key and
+// leaves flashnotes.sets untouched.
+function storageAvailable() {
+  try {
+    localStorage.setItem(PROBE_KEY, '1');
+    localStorage.removeItem(PROBE_KEY);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 // Returns an array of sets. Never throws: missing or bad data gives [].
 function loadSets() {
-  var raw;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch (e) {
-    return [];
+  var raw = null;
+  if (memoryCopy !== null) {
+    raw = memoryCopy;
+  } else {
+    try {
+      raw = localStorage.getItem(STORAGE_KEY);
+    } catch (e) {
+      return [];
+    }
   }
   if (!raw) return [];
   var data;
@@ -44,12 +65,16 @@ function loadSets() {
     });
 }
 
-// Stores the full array of sets. Returns true on success, false if storage failed.
+// Stores the full array of sets. Returns true on success. If the browser refuses,
+// keeps an in-memory copy (so loadSets still sees the change) and returns false.
 function saveSets(sets) {
+  var json = JSON.stringify(sets);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sets));
+    localStorage.setItem(STORAGE_KEY, json);
+    memoryCopy = null;
     return true;
   } catch (e) {
+    memoryCopy = json;
     return false;
   }
 }
@@ -332,6 +357,20 @@ function showView(name) {
   }
 }
 
+// Tells screen readers about a change (card flipped, answer revealed, score...).
+var announceTimer = null;
+function announce(text) {
+  var live = document.getElementById('live');
+  live.textContent = '';
+  clearTimeout(announceTimer);
+  // Set after a short delay so the same text twice in a row is still announced.
+  announceTimer = setTimeout(function () { live.textContent = text; }, 50);
+}
+
+function showStorageWarning() {
+  document.getElementById('storage-warning').hidden = false;
+}
+
 function renderHome() {
   var list = document.getElementById('set-list');
   var empty = document.getElementById('empty-msg');
@@ -356,33 +395,30 @@ function renderHome() {
 
     var actions = document.createElement('div');
     actions.className = 'set-actions';
-    var study = document.createElement('button');
-    study.type = 'button';
-    study.className = 'primary';
-    study.textContent = 'Study';
-    study.addEventListener('click', function () { onStudySet(set.id); });
-    actions.appendChild(study);
-    var testBtn = document.createElement('button');
-    testBtn.type = 'button';
-    testBtn.textContent = 'Test';
-    testBtn.addEventListener('click', function () { onTestSet(set.id); });
-    actions.appendChild(testBtn);
-    var edit = document.createElement('button');
-    edit.type = 'button';
-    edit.textContent = 'Edit';
-    edit.addEventListener('click', function () { onEditSet(set.id); });
-    actions.appendChild(edit);
-    var del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'danger';
-    del.textContent = 'Delete';
-    del.addEventListener('click', function () { onDeleteSet(set); });
-    actions.appendChild(del);
+    var noCards = set.cards.length === 0; // only possible with damaged/old data
+    actions.appendChild(makeRowButton('Study', set, 'primary', noCards, function () { onStudySet(set.id); }));
+    actions.appendChild(makeRowButton('Test', set, '', noCards, function () { onTestSet(set.id); }));
+    actions.appendChild(makeRowButton('Edit', set, '', false, function () { onEditSet(set.id); }));
+    actions.appendChild(makeRowButton('Delete', set, 'danger', false, function () { onDeleteSet(set); }));
 
     li.appendChild(info);
     li.appendChild(actions);
     list.appendChild(li);
   });
+}
+
+// A Home row button. Its accessible name includes the set name ("Study Spanish Verbs")
+// so screen-reader users can tell the rows' buttons apart.
+function makeRowButton(label, set, className, disabled, onClick) {
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  if (className) btn.className = className;
+  btn.textContent = label;
+  btn.setAttribute('aria-label', label + ' ' + set.name);
+  btn.disabled = disabled;
+  if (disabled) btn.title = 'This set has no cards. Edit it to add some.';
+  btn.addEventListener('click', onClick);
+  return btn;
 }
 
 function makeCardRow(card) {
@@ -451,9 +487,16 @@ function clearFormErrors() {
   var box = document.getElementById('form-errors');
   box.textContent = '';
   box.hidden = true;
-  document.getElementById('set-name').classList.remove('invalid');
-  var rows = document.querySelectorAll('#card-rows .card-row');
-  for (var i = 0; i < rows.length; i++) rows[i].classList.remove('invalid');
+  var invalid = document.querySelectorAll('#create-form .invalid, #create-form [aria-invalid]');
+  for (var i = 0; i < invalid.length; i++) {
+    invalid[i].classList.remove('invalid');
+    invalid[i].removeAttribute('aria-invalid');
+  }
+}
+
+function markInvalid(el) {
+  el.classList.add('invalid');
+  el.setAttribute('aria-invalid', 'true');
 }
 
 function showFormErrors(errors) {
@@ -465,8 +508,14 @@ function showFormErrors(errors) {
     var li = document.createElement('li');
     li.textContent = err.message;
     ul.appendChild(li);
-    if (err.field === 'name') document.getElementById('set-name').classList.add('invalid');
-    if (err.field === 'card' && rows[err.row]) rows[err.row].classList.add('invalid');
+    if (err.field === 'name') markInvalid(document.getElementById('set-name'));
+    if (err.field === 'card' && rows[err.row]) {
+      rows[err.row].classList.add('invalid');
+      var sides = rows[err.row].querySelectorAll('textarea');
+      for (var i = 0; i < sides.length; i++) {
+        if (!sides[i].value.trim()) sides[i].setAttribute('aria-invalid', 'true');
+      }
+    }
   });
   box.appendChild(ul);
   box.hidden = false;
@@ -482,13 +531,14 @@ function renderStudy(animate) {
   document.getElementById('study-next-btn').disabled = !view.canNext;
 
   var card = document.getElementById('study-card');
-  card.setAttribute('aria-label', view.side + ' of card. Activate to flip.');
   card.scrollTop = 0;
   card.classList.remove('flip');
   if (animate) {
     void card.offsetWidth; // restart the animation
     card.classList.add('flip');
   }
+  // animate = a flip on the same card; otherwise a new card, so say where we are.
+  announce((animate ? '' : view.position + '. ') + view.side + ': ' + view.text);
 }
 
 function renderTestSetup() {
@@ -507,6 +557,9 @@ function renderTest() {
   document.getElementById('test-answer-box').hidden = !view.revealed;
   document.getElementById('reveal-btn').hidden = view.revealed;
   document.getElementById('grade-buttons').hidden = !view.revealed;
+  announce(view.revealed
+    ? view.answerLabel + ': ' + view.answer + '. Press 1 for Got it or 2 for Missed it.'
+    : view.position + '. ' + view.promptLabel + ': ' + view.prompt);
 }
 
 function renderResults() {
@@ -548,6 +601,7 @@ function renderResults() {
   var retry = document.getElementById('retry-missed-btn');
   retry.textContent = 'Retry missed (' + missed.length + ')';
   retry.hidden = missed.length === 0;
+  announce('Test finished. Score ' + formatScore(score) + '.');
 }
 
 /* ===================== 4. Events and init ===================== */
@@ -661,6 +715,10 @@ function onStudyKey(event) {
     // A focused button would also be "clicked" by Space on keyup; release it first.
     if (document.activeElement && document.activeElement !== card) document.activeElement.blur();
     if (!event.repeat) onStudyFlip();
+  } else if (event.key === 'Enter' && document.activeElement === card) {
+    // The card is role="button", so Enter flips it too.
+    event.preventDefault();
+    if (!event.repeat) onStudyFlip();
   } else if (event.key === 'ArrowRight') {
     event.preventDefault();
     onStudyNext();
@@ -716,10 +774,9 @@ function onSaveSet(event) {
     }
     sets = addSet(loadSets(), created.value);
   }
-  if (!saveSets(sets)) {
-    showFormErrors([{ field: 'storage', message: 'Could not save: browser storage is unavailable.' }]);
-    return;
-  }
+  // If the browser refuses to save, saveSets keeps the sets in memory for this
+  // session (ADR 0005); warn that they won't survive closing the page.
+  if (!saveSets(sets)) showStorageWarning();
   state.editingId = null;
   goHome();
 }
@@ -731,7 +788,7 @@ function onCancelSetForm() {
 
 function onDeleteSet(set) {
   if (!confirm("Delete '" + set.name + "'? This can't be undone.")) return;
-  saveSets(deleteSet(loadSets(), set.id));
+  if (!saveSets(deleteSet(loadSets(), set.id))) showStorageWarning();
   goHome();
 }
 
@@ -754,6 +811,7 @@ function init() {
   document.getElementById('test-again-btn').addEventListener('click', onTestAgain);
   document.getElementById('results-home-btn').addEventListener('click', goHome);
   document.addEventListener('keydown', onKeyDown);
+  if (!storageAvailable()) showStorageWarning();
   goHome();
 }
 

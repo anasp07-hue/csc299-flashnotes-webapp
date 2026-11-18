@@ -237,11 +237,11 @@ tests.js     – a tiny test harness plus each phase's tests
 
 These small improvements are only worth doing if Phases 1–4 are done and working. Each item is independent.
 
-- **Responsive layout:** the app is usable on a phone-width screen (about 375 px).
-- **Dark mode:** follows `prefers-color-scheme`.
-- **Focus and accessibility:** visible focus outlines, buttons are real `<button>` elements, and the card in Study is focusable and announces its side to screen readers.
-- **Empty and edge states:** a set with exactly 1 card works in Study and in Test.
-- **Storage failure:** if `localStorage` is unavailable (for example, in some private browsing modes), show a one-line warning saying sets won't be saved.
+- [ ] **Responsive layout:** the app is usable on a phone-width screen (about 375 px). *Not done: skipped by choice.*
+- [x] **Dark mode:** follows `prefers-color-scheme`.
+- [x] **Focus and accessibility:** visible focus outlines, buttons are real `<button>` elements, and the card in Study is focusable and announces its side to screen readers.
+- [x] **Empty and edge states:** a set with exactly 1 card works in Study and in Test. (A set with 0 cards, which can only come from damaged data, has its Study and Test buttons disabled.)
+- [x] **Storage failure:** if `localStorage` is unavailable (for example, in some private browsing modes), show a one-line warning saying sets won't be saved. The app keeps working for the rest of the session using an in-memory copy (see ADR 0005).
 
 ---
 

@@ -581,4 +581,96 @@ test('edit round-trip through storage persists changes', function () {
   assertEqual([b.name, b.createdAt, b.cards.length, b.cards[0].id], ['B!', 200, 2, 'c_b1']);
 });
 
+/* ===================== Phase 5: polish ===================== */
+
+// Runs fn with localStorage writes (and optionally reads) throwing, like some
+// private browsing modes. Always restores storage and clears the in-memory copy.
+function withBrokenStorage(breakReads, fn) {
+  var realSet = Storage.prototype.setItem;
+  var realGet = Storage.prototype.getItem;
+  Storage.prototype.setItem = function () { throw new Error('QuotaExceededError (simulated)'); };
+  if (breakReads) Storage.prototype.getItem = function () { throw new Error('SecurityError (simulated)'); };
+  try {
+    fn();
+  } finally {
+    Storage.prototype.setItem = realSet;
+    Storage.prototype.getItem = realGet;
+    memoryCopy = null;
+  }
+}
+
+test('storageAvailable is true when localStorage works, and leaves no probe behind', function () {
+  assertEqual(storageAvailable(), true);
+  assertEqual(localStorage.getItem('flashnotes.probe'), null);
+});
+
+test('storageAvailable is false (and does not throw) when writes fail', function () {
+  withBrokenStorage(false, function () {
+    assertEqual(storageAvailable(), false);
+  });
+});
+
+test('when saving fails, saveSets returns false and sets still load this session', function () {
+  var set = createSet({ name: 'Mem', cards: [{ front: 'a', back: 'b' }] }).value;
+  withBrokenStorage(false, function () {
+    assertEqual(saveSets([set]), false);
+    assertEqual(loadSets().map(function (s) { return s.name; }), ['Mem']);
+    var next = deleteSet(loadSets(), set.id);
+    assertEqual(saveSets(next), false);
+    assertEqual(loadSets(), []);
+  });
+  assertEqual(localStorage.getItem(STORAGE_KEY), null, 'nothing reached real storage');
+});
+
+test('loadSets returns [] (no crash) when even reading storage throws', function () {
+  withBrokenStorage(true, function () {
+    assertEqual(loadSets(), []);
+  });
+});
+
+test('a successful save after a failure goes back to real storage', function () {
+  var a = createSet({ name: 'A', cards: [{ front: 'a', back: 'b' }] }).value;
+  var realSet = Storage.prototype.setItem;
+  Storage.prototype.setItem = function () { throw new Error('full'); };
+  try {
+    assertEqual(saveSets([a]), false);
+  } finally {
+    Storage.prototype.setItem = realSet;
+  }
+  assertEqual(saveSets(loadSets()), true);
+  assertEqual(memoryCopy, null, 'in-memory copy cleared');
+  assertEqual(JSON.parse(localStorage.getItem(STORAGE_KEY))[0].name, 'A');
+});
+
+test('a 1-card set works in Study: both directions disabled, flip works', function () {
+  var s = startStudy(sampleSet(1));
+  assertEqual(studyView(s), { text: 'F0', side: 'Front', position: 'Card 1 of 1', canPrev: false, canNext: false });
+  assertEqual(studyNext(s).index, 0);
+  assertEqual(studyPrev(s).index, 0);
+  assertEqual(studyView(studyFlip(s)).text, 'B0');
+});
+
+test('a 1-card set works in Test: one grade finishes, retry has that card', function () {
+  var s = startTest(sampleSet(1).cards, 'back');
+  assertEqual(testView(s).position, 'Card 1 of 1');
+  assertEqual(testView(s).prompt, 'B0');
+  s = gradeCard(revealAnswer(s), false);
+  assert(isTestDone(s), 'done after one grade');
+  assertEqual(formatScore(testScore(s)), '0 / 1 (0%)');
+  var retry = retryMissed(s);
+  assertEqual([retry.cards.length, retry.side], [1, 'back']);
+  retry = gradeCard(revealAnswer(retry), true);
+  assertEqual(formatScore(testScore(retry)), '1 / 1 (100%)');
+  assertEqual(missedCards(retry), []);
+});
+
+test('a 0-card set (damaged data) does not crash Study or Test logic', function () {
+  var empty = { id: 's_e', name: 'Empty', createdAt: 1, cards: [] };
+  var v = studyView(startStudy(empty));
+  assertEqual([v.text, v.position, v.canPrev, v.canNext], ['', 'Card 0 of 0', false, false]);
+  var t = startTest(empty.cards, 'front');
+  assert(isTestDone(t), 'an empty test is already done');
+  assertEqual(testScore(t), { correct: 0, total: 0, percent: 0 });
+});
+
 runTests();
