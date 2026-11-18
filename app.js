@@ -116,6 +116,35 @@ function createSet(draft, now) {
   return { ok: true, value: set };
 }
 
+// Validates a draft and returns a new sets array with set `id` updated in place.
+// The set keeps its id, createdAt and position. A card keeps its id only if that id
+// already belongs to this set (and isn't used twice); other cards get new ids.
+// Returns { ok: true, value: newSets } or { ok: false, errors }.
+function updateSet(sets, id, draft) {
+  var existing = findSet(sets, id);
+  if (!existing) {
+    return { ok: false, errors: [{ field: 'set', message: 'This set no longer exists.' }] };
+  }
+  var result = validateSet(draft);
+  if (!result.ok) return result;
+
+  var ownIds = {};
+  existing.cards.forEach(function (c) { ownIds[c.id] = true; });
+  var used = {};
+  var cards = result.value.cards.map(function (c) {
+    var cardId = c.id;
+    if (!cardId || !ownIds[cardId] || used[cardId]) cardId = newId('c_');
+    used[cardId] = true;
+    return { id: cardId, front: c.front, back: c.back };
+  });
+
+  var updated = { id: existing.id, name: result.value.name, createdAt: existing.createdAt, cards: cards };
+  return {
+    ok: true,
+    value: sets.map(function (s) { return s.id === id ? updated : s; })
+  };
+}
+
 // Returns a new array with the set added.
 function addSet(sets, set) {
   return sets.concat([set]);
@@ -289,6 +318,7 @@ function studyView(session) {
 var state = {
   view: 'home',
   sets: [],
+  editingId: null, // id of the set being edited, or null when creating
   study: null,
   testSet: null, // { id, name, cards } of the set being tested
   test: null     // current test session
@@ -337,6 +367,11 @@ function renderHome() {
     testBtn.textContent = 'Test';
     testBtn.addEventListener('click', function () { onTestSet(set.id); });
     actions.appendChild(testBtn);
+    var edit = document.createElement('button');
+    edit.type = 'button';
+    edit.textContent = 'Edit';
+    edit.addEventListener('click', function () { onEditSet(set.id); });
+    actions.appendChild(edit);
     var del = document.createElement('button');
     del.type = 'button';
     del.className = 'danger';
@@ -353,6 +388,7 @@ function renderHome() {
 function makeCardRow(card) {
   var row = document.createElement('div');
   row.className = 'card-row';
+  if (card && card.id) row.setAttribute('data-card-id', card.id);
 
   var front = document.createElement('textarea');
   front.className = 'card-front';
@@ -382,11 +418,17 @@ function makeCardRow(card) {
   return row;
 }
 
-function renderCreate() {
-  document.getElementById('set-name').value = '';
+// Fills the set form: empty with 3 rows for a new set, or pre-filled for editing.
+function renderSetForm(set) {
+  document.getElementById('form-title').textContent = set ? 'Edit set' : 'New set';
+  document.getElementById('set-name').value = set ? set.name : '';
   var rows = document.getElementById('card-rows');
   rows.textContent = '';
-  for (var i = 0; i < 3; i++) rows.appendChild(makeCardRow());
+  if (set) {
+    set.cards.forEach(function (card) { rows.appendChild(makeCardRow(card)); });
+  } else {
+    for (var i = 0; i < 3; i++) rows.appendChild(makeCardRow());
+  }
   clearFormErrors();
 }
 
@@ -394,10 +436,13 @@ function readDraft() {
   var rows = document.querySelectorAll('#card-rows .card-row');
   var cards = [];
   for (var i = 0; i < rows.length; i++) {
-    cards.push({
+    var card = {
       front: rows[i].querySelector('.card-front').value,
       back: rows[i].querySelector('.card-back').value
-    });
+    };
+    var cardId = rows[i].getAttribute('data-card-id');
+    if (cardId) card.id = cardId;
+    cards.push(card);
   }
   return { name: document.getElementById('set-name').value, cards: cards };
 }
@@ -632,7 +677,17 @@ function goHome() {
 }
 
 function onNewSet() {
-  renderCreate();
+  state.editingId = null;
+  renderSetForm(null);
+  showView('create');
+  document.getElementById('set-name').focus();
+}
+
+function onEditSet(id) {
+  var set = findSet(loadSets(), id);
+  if (!set) { goHome(); return; }
+  state.editingId = set.id;
+  renderSetForm(set);
   showView('create');
   document.getElementById('set-name').focus();
 }
@@ -645,16 +700,32 @@ function onAddCard() {
 
 function onSaveSet(event) {
   event.preventDefault();
-  var result = createSet(readDraft());
-  if (!result.ok) {
-    showFormErrors(result.errors);
-    return;
+  var sets;
+  if (state.editingId) {
+    var updated = updateSet(loadSets(), state.editingId, readDraft());
+    if (!updated.ok) {
+      showFormErrors(updated.errors);
+      return;
+    }
+    sets = updated.value;
+  } else {
+    var created = createSet(readDraft());
+    if (!created.ok) {
+      showFormErrors(created.errors);
+      return;
+    }
+    sets = addSet(loadSets(), created.value);
   }
-  var sets = addSet(loadSets(), result.value);
   if (!saveSets(sets)) {
     showFormErrors([{ field: 'storage', message: 'Could not save: browser storage is unavailable.' }]);
     return;
   }
+  state.editingId = null;
+  goHome();
+}
+
+function onCancelSetForm() {
+  state.editingId = null; // nothing was saved, so the stored set is unchanged
   goHome();
 }
 
@@ -668,7 +739,7 @@ function init() {
   document.getElementById('new-set-btn').addEventListener('click', onNewSet);
   document.getElementById('add-card-btn').addEventListener('click', onAddCard);
   document.getElementById('create-form').addEventListener('submit', onSaveSet);
-  document.getElementById('cancel-create-btn').addEventListener('click', goHome);
+  document.getElementById('cancel-create-btn').addEventListener('click', onCancelSetForm);
   document.getElementById('study-back-btn').addEventListener('click', goHome);
   document.getElementById('study-card').addEventListener('click', onStudyFlip);
   document.getElementById('study-prev-btn').addEventListener('click', onStudyPrev);

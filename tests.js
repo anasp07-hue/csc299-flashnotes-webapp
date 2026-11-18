@@ -461,4 +461,124 @@ test('test functions do not change their input session', function () {
   assertEqual(JSON.stringify(r), rCopy);
 });
 
+/* ===================== Phase 4: edit a set ===================== */
+
+function twoSets() {
+  return [
+    { id: 's_a', name: 'A', createdAt: 100, cards: [
+      { id: 'c_a1', front: 'a1', back: 'A1' },
+      { id: 'c_a2', front: 'a2', back: 'A2' },
+      { id: 'c_a3', front: 'a3', back: 'A3' }
+    ] },
+    { id: 's_b', name: 'B', createdAt: 200, cards: [{ id: 'c_b1', front: 'b1', back: 'B1' }] }
+  ];
+}
+
+test('updating a set keeps its id and createdAt, and changes the name', function () {
+  var r = updateSet(twoSets(), 's_a', {
+    name: '  Renamed ',
+    cards: [{ id: 'c_a1', front: 'a1', back: 'A1' }]
+  });
+  assert(r.ok, 'should be accepted');
+  var set = findSet(r.value, 's_a');
+  assertEqual([set.id, set.createdAt, set.name], ['s_a', 100, 'Renamed']);
+});
+
+test('existing cards keep their ids and get the new text', function () {
+  var r = updateSet(twoSets(), 's_a', {
+    name: 'A',
+    cards: [{ id: 'c_a1', front: 'a1 edited', back: 'A1' }, { id: 'c_a2', front: 'a2', back: 'A2 edited' }, { id: 'c_a3', front: 'a3', back: 'A3' }]
+  });
+  var cards = findSet(r.value, 's_a').cards;
+  assertEqual(cards, [
+    { id: 'c_a1', front: 'a1 edited', back: 'A1' },
+    { id: 'c_a2', front: 'a2', back: 'A2 edited' },
+    { id: 'c_a3', front: 'a3', back: 'A3' }
+  ]);
+});
+
+test('new cards get new, unique ids', function () {
+  var r = updateSet(twoSets(), 's_a', {
+    name: 'A',
+    cards: [{ id: 'c_a1', front: 'a1', back: 'A1' }, { front: 'new1', back: 'N1' }, { front: 'new2', back: 'N2' }]
+  });
+  var cards = findSet(r.value, 's_a').cards;
+  assertEqual(cards[0].id, 'c_a1');
+  var newIds = [cards[1].id, cards[2].id];
+  newIds.forEach(function (id) {
+    assert(typeof id === 'string' && id.indexOf('c_') === 0, 'new id should start with c_');
+    assert(['c_a1', 'c_a2', 'c_a3', 'c_b1'].indexOf(id) < 0, 'new id must not reuse an existing id');
+  });
+  assert(newIds[0] !== newIds[1], 'the two new ids must differ');
+});
+
+test('removed cards are gone from the saved set', function () {
+  var r = updateSet(twoSets(), 's_a', {
+    name: 'A',
+    cards: [{ id: 'c_a1', front: 'a1', back: 'A1' }, { id: 'c_a3', front: 'a3', back: 'A3' }]
+  });
+  assertEqual(ids(findSet(r.value, 's_a').cards), ['c_a1', 'c_a3']);
+});
+
+test('updating one set leaves the other sets and the order unchanged', function () {
+  var before = twoSets();
+  var r = updateSet(before, 's_a', { name: 'A2', cards: [{ id: 'c_a1', front: 'x', back: 'y' }] });
+  assertEqual(r.value.map(function (s) { return s.id; }), ['s_a', 's_b']);
+  assertEqual(r.value[1], before[1]);
+});
+
+test('an invalid edit is rejected and leaves the stored set unchanged', function () {
+  saveSets(twoSets());
+  var stored = JSON.stringify(loadSets());
+  var drafts = [
+    { name: '', cards: [{ id: 'c_a1', front: 'a1', back: 'A1' }] },     // empty name
+    { name: 'A', cards: [] },                                            // every card removed
+    { name: 'A', cards: [{ id: 'c_a1', front: 'a1', back: '' }] }        // half-filled card
+  ];
+  drafts.forEach(function (d) {
+    var r = updateSet(loadSets(), 's_a', d);
+    assert(!r.ok, 'should be rejected: ' + JSON.stringify(d));
+    assert(r.errors.length > 0, 'should have errors');
+  });
+  assertEqual(JSON.stringify(loadSets()), stored);
+});
+
+test('updateSet does not change its input array', function () {
+  var sets = twoSets();
+  var copy = JSON.stringify(sets);
+  updateSet(sets, 's_a', { name: 'Changed', cards: [{ front: 'n', back: 'N' }] });
+  updateSet(sets, 's_a', { name: '', cards: [] });
+  assertEqual(JSON.stringify(sets), copy);
+});
+
+test('updating a set that does not exist is rejected', function () {
+  var r = updateSet(twoSets(), 's_missing', { name: 'X', cards: [{ front: 'a', back: 'b' }] });
+  assert(!r.ok, 'should be rejected');
+  assertEqual(r.errors[0].field, 'set');
+});
+
+test('card ids from another set, or used twice, are replaced with new ids', function () {
+  var r = updateSet(twoSets(), 's_a', {
+    name: 'A',
+    cards: [
+      { id: 'c_b1', front: 'stolen', back: 'id' },   // belongs to set B
+      { id: 'c_a1', front: 'one', back: '1' },
+      { id: 'c_a1', front: 'dup', back: '2' }        // same id twice
+    ]
+  });
+  var cardIds = ids(findSet(r.value, 's_a').cards);
+  assert(cardIds[0] !== 'c_b1', 'foreign id must be replaced');
+  assertEqual(cardIds[1], 'c_a1');
+  assert(cardIds[2] !== 'c_a1', 'duplicate id must be replaced');
+  assertEqual(Object.keys(cardIds.reduce(function (m, id) { m[id] = 1; return m; }, {})).length, 3, 'all ids unique');
+});
+
+test('edit round-trip through storage persists changes', function () {
+  saveSets(twoSets());
+  var r = updateSet(loadSets(), 's_b', { name: 'B!', cards: [{ id: 'c_b1', front: 'b1', back: 'B1' }, { front: 'b2', back: 'B2' }] });
+  saveSets(r.value);
+  var b = findSet(loadSets(), 's_b');
+  assertEqual([b.name, b.createdAt, b.cards.length, b.cards[0].id], ['B!', 200, 2, 'c_b1']);
+});
+
 runTests();

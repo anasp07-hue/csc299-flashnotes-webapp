@@ -225,11 +225,11 @@ tests.js     – a tiny test harness plus each phase's tests
 
 ### Acceptance criteria
 
-- [ ] Editing a card's text and saving updates it in Study and in Test.
-- [ ] Adding and removing cards updates the card count on Home.
-- [ ] Cancel leaves the set exactly as it was.
-- [ ] An edit that breaks validation (for example, removing every card) is blocked with an error.
-- [ ] Edits persist after a page refresh.
+- [x] Editing a card's text and saving updates it in Study and in Test.
+- [x] Adding and removing cards updates the card count on Home.
+- [x] Cancel leaves the set exactly as it was.
+- [x] An edit that breaks validation (for example, removing every card) is blocked with an error.
+- [x] Edits persist after a page refresh.
 
 ---
 
